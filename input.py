@@ -1,24 +1,33 @@
 import cv2
 import numpy as np
 import time
+import serial
+
 
 def model():
     return cv2.dnn.readNetFromCaffe('model/deploy.prototxt', 'model/res10_300x300_ssd_iter_140000_fp16.caffemodel')
 
+
 def capture_camera():
     cap = cv2.VideoCapture(0)
     net = model()
-    
+
     if not cap.isOpened():
         print("Error: Could not open video stream.")
         return
-    
+
     person_detected = False
     last_out_of_frame_time = None
     last_in_frame = None
     previous_pos = None
     last_movement = None
     last_check_time = time.time()
+
+    try:
+        ser = serial.Serial('COM3', 9600)
+    except serial.SerialException as e:
+        print(f"Error opening serial port: {e}")
+        return
 
     while True:
         # Capture frame-by-frame
@@ -31,8 +40,9 @@ def capture_camera():
         (h, w) = frame.shape[:2]
         center_x = w // 2
         center_y = h // 2
-        blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 1.0, (300, 300), (104.0, 177.0, 123.0))
-        
+        blob = cv2.dnn.blobFromImage(cv2.resize(
+            frame, (300, 300)), 1.0, (300, 300), (104.0, 177.0, 123.0))
+
         net.setInput(blob)
         detections = net.forward()
         current_person_detected = False
@@ -40,7 +50,7 @@ def capture_camera():
 
         for i in range(detections.shape[2]):
             confidence = detections[0, 0, i, 2]
-            
+
             # Filter out weak detections
             if confidence > 0.5:
                 current_person_detected = True
@@ -50,13 +60,15 @@ def capture_camera():
 
                 # Draw the bounding box around the detected object
                 label = f"Human Detected: {confidence * 100:.2f}%"
-                cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
+                cv2.rectangle(frame, (startX, startY),
+                              (endX, endY), (0, 255, 0), 2)
                 y = startY - 10 if startY - 10 > 10 else startY + 10
-                cv2.putText(frame, label, (startX, y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 2)
+                cv2.putText(frame, label, (startX, y),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 2)
 
         current_time = time.time()
 
-        if current_person_detected: 
+        if current_person_detected:
             if last_in_frame is None:
                 last_in_frame = current_time
             elif not person_detected and (current_time - last_in_frame) > 2:
@@ -64,6 +76,9 @@ def capture_camera():
                 person_detected = True
                 last_out_of_frame_time = None
                 last_in_frame = None
+                ser.write(b'E')
+                print("Entry buzzer triggered")
+                time.sleep(0.5)
 
             if current_pos is not None and previous_pos != current_pos and (current_time - last_check_time) > 5:
                 x, y = current_pos
@@ -102,30 +117,33 @@ def capture_camera():
                     elif prev_x > 2 * w / 3:
                         horizontal_direction = "right"
                         directions.append("right")
-                    else: 
+                    else:
                         horizontal_direction = 'no horizontal movement'
-                    
+
                     if prev_y < h / 3:
                         vertical_direction = "down"
                         directions.append("down")
                     elif prev_y > 2 * h / 3:
                         vertical_direction = "up"
                         directions.append("up")
-                    else: 
+                    else:
                         vertical_direction = "no vertical movement"
 
-                    print(f"Human out of frame, moved to the {horizontal_direction} and {vertical_direction}")
-                person_detected = False 
+                    print(
+                        f"Human out of frame, moved to the {horizontal_direction} and {vertical_direction}")
+                person_detected = False
                 last_out_of_frame_time = None
                 last_in_frame = None
                 last_movement = None
 
         cv2.imshow('Frame', frame)
-        
+
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
+    ser.close()
     cap.release()
     cv2.destroyAllWindows()
+
 
 capture_camera()
