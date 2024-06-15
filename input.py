@@ -17,6 +17,8 @@ def capture_camera():
     last_out_of_frame_time = None
     last_in_frame = None
     previous_pos = None
+    last_movement = None
+    last_check_time = time.time()
 
     while True:
         # Capture frame-by-frame
@@ -35,7 +37,6 @@ def capture_camera():
         detections = net.forward()
         current_person_detected = False
         current_pos = None
-        
 
         for i in range(detections.shape[2]):
             confidence = detections[0, 0, i, 2]
@@ -58,29 +59,38 @@ def capture_camera():
         if current_person_detected: 
             if last_in_frame is None:
                 last_in_frame = current_time
-            elif not person_detected and  (current_time - last_in_frame) > 1 :
+            elif not person_detected and (current_time - last_in_frame) > 2:
                 print("Human detected")
                 person_detected = True
                 last_out_of_frame_time = None
                 last_in_frame = None
-            if current_person_detected and current_pos is not None and previous_pos != current_pos:
+
+            if current_pos is not None and previous_pos != current_pos and (current_time - last_check_time) > 5:
                 x, y = current_pos
                 if abs(x - center_x) > w // 10 or abs(y - center_y) > h // 10:
+                    new_movement = ""
                     if x < center_x:
-                        print("Move right to center the person.")
+                        new_movement += "Move right to center the person. "
                     elif x > center_x:
-                        print("Move left to center the person.")
-                    if y < center_y:
-                        print("Move down to center the person.")
-                    elif y > center_y:
-                        print("Move up to center the person.")
-                else: 
-                    print("person centered") 
+                        new_movement += "Move left to center the person. "
+                    # if y < center_y:
+                    #     new_movement += "Move down to center the person. "
+                    # elif y > center_y:
+                    #     new_movement += "Move up to center the person."
+
+                    if new_movement != last_movement:
+                        print(new_movement)
+                        last_movement = new_movement
+                    last_check_time = current_time  # Update the last check time
+                else:
+                    if last_movement != "person centered":
+                        print("person centered")
+                        last_movement = "person centered"
             previous_pos = current_pos
         else:
             if person_detected and last_out_of_frame_time is None:
                 last_out_of_frame_time = current_time
-            elif last_out_of_frame_time is not None and (current_time - last_out_of_frame_time) > 3:
+            elif last_out_of_frame_time is not None and (current_time - last_out_of_frame_time) > 4:
                 if previous_pos:
                     prev_x, prev_y = previous_pos
                     directions = []
@@ -105,11 +115,10 @@ def capture_camera():
                         vertical_direction = "no vertical movement"
 
                     print(f"Human out of frame, moved to the {horizontal_direction} and {vertical_direction}")
-                    # if directions:
-                    #     print(f"Human out of frame, moved to the {' and '.join(directions)}")
                 person_detected = False 
                 last_out_of_frame_time = None
                 last_in_frame = None
+                last_movement = None
 
         cv2.imshow('Frame', frame)
         
