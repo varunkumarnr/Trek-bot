@@ -23,3 +23,6 @@ plugins {
 }
 
 include ":app"
+def opencvsdk='E:/OpenCV-android-sdk'
+include ':opencv'
+project(':opencv').projectDir = new File(opencvsdk + '/sdk')

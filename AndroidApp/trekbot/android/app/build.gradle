@@ -52,6 +52,14 @@ android {
         }
     }
 }
+dependencies {
+    // Example dependencies
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation project(':opencv')
+
+    // Include any other dependencies your app requires
+}
+
 
 flutter {
     source = "../.."
