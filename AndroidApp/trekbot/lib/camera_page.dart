@@ -1,9 +1,8 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:google_ml_vision/google_ml_vision.dart';
-import 'dart:math';
+import 'voice_agent.dart';
 
 class MainPage extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -19,14 +18,22 @@ class _MainPageState extends State<MainPage> {
   bool isDetecting = false;
   List<Face> faces = [];
   Timer? processingTimer;
+  Timer? noFaceTimer;
   List<List<Offset>> previousPositions = [];
   bool wasFacesEmpty = true;
-  bool isFrontCamera = false; // Track if front camera is active
+  bool isFrontCamera = false;
+  late VoiceService _voiceService;
 
   @override
   void initState() {
     super.initState();
     startCamera();
+    _voiceService = VoiceService();
+    _voiceService.onCommand = (command) {
+      if (command == 'capture photo') {
+        print("captured");
+      }
+    };
   }
 
   void startCamera() async {
@@ -67,7 +74,7 @@ class _MainPageState extends State<MainPage> {
       int sensorOrientation = description.sensorOrientation;
 
       // Determine the rotation dynamically based on sensor orientation
-      ImageRotation rotation = _rotationIntToImageRotation(sensorOrientation);
+      // ImageRotation rotation = _rotationIntToImageRotation(sensorOrientation);
       final GoogleVisionImage visionImage = GoogleVisionImage.fromBytes(
         image.planes[0].bytes,
         GoogleVisionImageMetadata(
@@ -123,10 +130,6 @@ class _MainPageState extends State<MainPage> {
       }
     }
 
-    if (lastPositions.isEmpty) {
-      return;
-    }
-
     // Your existing logic to calculate direction based on lastPositions
     double previewWidth = cameraController.value.previewSize!.width;
     double previewHeight = cameraController.value.previewSize!.height;
@@ -168,9 +171,9 @@ class _MainPageState extends State<MainPage> {
 
     String directionHorizontal;
     if (minDistanceLeft <= minDistanceRight) {
-      directionHorizontal = "left";
-    } else {
       directionHorizontal = "right";
+    } else {
+      directionHorizontal = "left";
     }
 
     // Combine vertical and horizontal directions
@@ -179,24 +182,23 @@ class _MainPageState extends State<MainPage> {
     int facesCount =
         lastPositions.length; // Number of faces detected in the last frame
     String message = "Detected ${facesCount} faces. User moved ${direction}.";
-
-    print(message); // Output example: Detected 0 faces. User moved left-down.
+    print(message);
   }
 
-  ImageRotation _rotationIntToImageRotation(int rotation) {
-    switch (rotation) {
-      case 0:
-        return ImageRotation.rotation0;
-      case 90:
-        return ImageRotation.rotation90;
-      case 180:
-        return ImageRotation.rotation180;
-      case 270:
-        return ImageRotation.rotation270;
-      default:
-        throw Exception("Unknown rotation $rotation");
-    }
-  }
+  // ImageRotation _rotationIntToImageRotation(int rotation) {
+  //   switch (rotation) {
+  //     case 0:
+  //       return ImageRotation.rotation0;
+  //     case 90:
+  //       return ImageRotation.rotation90;
+  //     case 180:
+  //       return ImageRotation.rotation180;
+  //     case 270:
+  //       return ImageRotation.rotation270;
+  //     default:
+  //       throw Exception("Unknown rotation $rotation");
+  //   }
+  // }
 
   @override
   void dispose() {
@@ -222,86 +224,14 @@ class _MainPageState extends State<MainPage> {
         child: FittedBox(
           child: FloatingActionButton(
             onPressed: switchCamera,
+            backgroundColor: Colors.blue,
             child: Icon(
               isFrontCamera ? Icons.camera_rear : Icons.camera_front,
               size: 24.0, // Adjust the icon size if needed
             ),
-            backgroundColor: Colors.blue,
           ),
         ),
       ),
     );
   }
 }
-
-// class FacePainter extends CustomPainter {
-//   final List<Face> faces;
-//   final double imageHeight;
-//   final double imageWidth;
-//   final int sensorOrientation;
-
-//   FacePainter(
-//       this.faces, this.imageHeight, this.imageWidth, this.sensorOrientation);
-
-//   @override
-//   void paint(Canvas canvas, Size size) {
-//     final paint = Paint()
-//       ..color = Colors.red
-//       ..style = PaintingStyle.stroke
-//       ..strokeWidth = 2.0;
-
-//     double scale = size.width /
-//         imageWidth; // Adjust scale based on preview size and image size
-//     for (var face in faces) {
-//       Rect rect = _adjustBoundingBox(face.boundingBox, scale);
-//       canvas.drawRect(
-//         rect,
-//         paint,
-//       );
-//     }
-//   }
-
-//   Rect _adjustBoundingBox(Rect boundingBox, double scale) {
-//     double left = boundingBox.left * scale;
-//     double top = boundingBox.top * scale;
-//     double right = boundingBox.right * scale;
-//     double bottom = boundingBox.bottom * scale;
-
-//     // Adjust based on sensorOrientation
-//     switch (sensorOrientation) {
-//       case 90:
-//         return Rect.fromLTRB(
-//           imageHeight - bottom,
-//           left,
-//           imageHeight - top,
-//           right,
-//         );
-//       case 180:
-//         return Rect.fromLTRB(
-//           imageWidth - right,
-//           imageHeight - bottom,
-//           imageWidth - left,
-//           imageHeight - top,
-//         );
-//       case 270:
-//         return Rect.fromLTRB(
-//           top,
-//           imageWidth - right,
-//           bottom,
-//           imageWidth - left,
-//         );
-//       default:
-//         return Rect.fromLTRB(
-//           left,
-//           top,
-//           right,
-//           bottom,
-//         );
-//     }
-//   }
-
-//   @override
-//   bool shouldRepaint(covariant CustomPainter oldDelegate) {
-//     return true;
-//   }
-// }
