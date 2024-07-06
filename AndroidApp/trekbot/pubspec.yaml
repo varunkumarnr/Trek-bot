@@ -12,7 +12,7 @@ dependencies:
   camera: ^0.11.0+1
   gap: ^3.0.1
   external_path: ^1.0.3
-  image: ^4.2.0
+  media_scanner: ^2.1.0
   google_ml_vision: ^0.0.8
   speech_to_text: ^6.6.2
   permission_handler: ^11.3.1

@@ -1,5 +1,4 @@
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:permission_handler/permission_handler.dart';
 
 class VoiceService {
   late stt.SpeechToText _speech;
@@ -45,8 +44,8 @@ class VoiceService {
     _speech.listen(
       onResult: (result) {
         print("Recognized Words: ${result.recognizedWords}");
-        onCommand?.call(result.recognizedWords.split('').first);
-        print("result : ${result.recognizedWords.split('').first}");
+        onCommand?.call(result.recognizedWords.split(' ').first);
+        print("result : ${result.recognizedWords.split(' r').first}");
       },
       listenFor: Duration(seconds: 60),
       pauseFor: Duration(seconds: 10),

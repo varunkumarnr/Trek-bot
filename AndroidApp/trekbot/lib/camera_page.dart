@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:google_ml_vision/google_ml_vision.dart';
 import 'voice_agent.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:external_path/external_path.dart';
+import 'package:media_scanner/media_scanner.dart';
 
 class MainPage extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -24,6 +27,7 @@ class _MainPageState extends State<MainPage> {
   bool wasFacesEmpty = true;
   bool isFrontCamera = false;
   late VoiceService _voiceService;
+  List<File> imagesList = [];
 
   @override
   void initState() {
@@ -81,6 +85,7 @@ class _MainPageState extends State<MainPage> {
     _voiceService.onCommand = (command) {
       if (command == 'capture') {
         print("Capture photo command received");
+        takePicture();
       }
     };
   }
@@ -120,9 +125,44 @@ class _MainPageState extends State<MainPage> {
   void switchCamera() {
     setState(() {
       isFrontCamera = !isFrontCamera;
-      cameraController.dispose(); // Dispose of current controller
-      startCamera(); // Restart camera with new selected camera
+      cameraController.dispose();
+      startCamera();
     });
+  }
+
+  Future<File> saveImage(XFile image) async {
+    final downloadPath = await ExternalPath.getExternalStoragePublicDirectory(
+        ExternalPath.DIRECTORY_DOWNLOADS);
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}.png';
+    final file = File('$downloadPath/$fileName');
+
+    try {
+      await file.writeAsBytes(await image.readAsBytes());
+    } catch (e) {
+      print('Error saving image: $e');
+    }
+
+    return file;
+  }
+
+  void takePicture() async {
+    XFile? image;
+    if (cameraController.value.isTakingPicture ||
+        !cameraController.value.isInitialized) {
+      return;
+    }
+    try {
+      image = await cameraController.takePicture();
+    } catch (e) {
+      print('Error taking picture: $e');
+      return;
+    }
+
+    final file = await saveImage(image);
+    setState(() {
+      imagesList.add(file);
+    });
+    MediaScanner.loadMedia(path: file.path);
   }
 
   void processCameraImage(CameraImage image) async {
@@ -161,7 +201,6 @@ class _MainPageState extends State<MainPage> {
             faces.map((face) => face.boundingBox.center).toList();
         previousPositions.add(currentFacePositions);
 
-        // Check for transition from detecting faces to not detecting any faces
         if (!wasFacesEmpty && faces.isEmpty) {
           detectDirection(previousPositions);
         }
@@ -177,7 +216,6 @@ class _MainPageState extends State<MainPage> {
   }
 
   void detectDirection(List<List<Offset>> previousPositions) {
-    // Find the last non-empty list of offsets in previousPositions
     List<Offset> lastPositions = [];
     for (int i = previousPositions.length - 1; i >= 0; i--) {
       if (previousPositions[i].isNotEmpty) {
@@ -186,12 +224,10 @@ class _MainPageState extends State<MainPage> {
       }
     }
 
-    // Your existing logic to calculate direction based on lastPositions
     double previewWidth = cameraController.value.previewSize!.width;
     double previewHeight = cameraController.value.previewSize!.height;
     Offset previewCenter = Offset(previewWidth / 2, previewHeight / 2);
 
-    // Calculate distances from each face position to the edges of the preview area
     double minDistanceTop = double.infinity;
     double minDistanceBottom = double.infinity;
     double minDistanceLeft = double.infinity;
@@ -217,7 +253,6 @@ class _MainPageState extends State<MainPage> {
       }
     }
 
-    // Determine the closest edges for both vertical and horizontal movements
     String directionVertical;
     if (minDistanceTop <= minDistanceBottom) {
       directionVertical = "up";
@@ -231,12 +266,9 @@ class _MainPageState extends State<MainPage> {
     } else {
       directionHorizontal = "left";
     }
-
-    // Combine vertical and horizontal directions
     String direction = "$directionVertical-$directionHorizontal";
 
-    int facesCount =
-        lastPositions.length; // Number of faces detected in the last frame
+    int facesCount = lastPositions.length;
     String message = "Detected ${facesCount} faces. User moved ${direction}.";
     print(message);
   }
@@ -259,20 +291,59 @@ class _MainPageState extends State<MainPage> {
             future: cameraValue,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.done) {
-                // If camera initialization is complete, show CameraPreview
                 return CameraPreview(cameraController);
               } else if (snapshot.hasError) {
-                // If there's an error during initialization, handle it
                 return Center(
                   child: Text('Error: ${snapshot.error}'),
                 );
               } else {
-                // While waiting for initialization, show a progress indicator
                 return Center(
                   child: CircularProgressIndicator(),
                 );
               }
             },
+          ),
+          Align(
+            alignment: Alignment.bottomLeft,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 7, bottom: 75),
+                    child: Container(
+                      height: 100,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: imagesList.length,
+                        scrollDirection: Axis.horizontal,
+                        itemBuilder: (BuildContext context, int index) {
+                          return Padding(
+                            padding: const EdgeInsets.all(2),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image(
+                                height: 100,
+                                width: 100,
+                                opacity: const AlwaysStoppedAnimation(1.0),
+                                image: FileImage(
+                                  File(imagesList[index].path),
+                                ),
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
