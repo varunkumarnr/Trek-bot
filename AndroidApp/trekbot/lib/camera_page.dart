@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:google_ml_vision/google_ml_vision.dart';
 import 'voice_agent.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class MainPage extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -27,13 +28,65 @@ class _MainPageState extends State<MainPage> {
   @override
   void initState() {
     super.initState();
+    _requestPermissions();
+  }
+
+  void _requestPermissions() async {
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.microphone,
+      Permission.camera,
+    ].request();
+
+    if (statuses[Permission.microphone] != PermissionStatus.granted ||
+        statuses[Permission.camera] != PermissionStatus.granted) {
+      print("Permission denied");
+      _showPermissionDialog();
+      return;
+    }
     startCamera();
-    _voiceService = VoiceService();
+    _initVoiceService();
+  }
+
+  void _showPermissionDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Permissions Required"),
+          content: Text(
+              "This app needs camera, microphone, and storage permissions to function properly. Please grant them in your device settings."),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                openAppSettings();
+              },
+              child: Text("Open Settings"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text("Cancel"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _initVoiceService() {
+    _voiceService =
+        VoiceService(onListeningStatusChanged: _handleListeningStatusChanged);
     _voiceService.onCommand = (command) {
-      if (command == 'capture photo') {
-        print("captured");
+      if (command == 'capture') {
+        print("Capture photo command received");
       }
     };
+  }
+
+  void _handleListeningStatusChanged(bool isListening) {
+    print("Listening status changed: $isListening");
   }
 
   void startCamera() async {
@@ -42,10 +95,13 @@ class _MainPageState extends State<MainPage> {
       selectedCamera,
       ResolutionPreset.high,
     );
-    cameraValue = cameraController.initialize().then((_) {
+    try {
+      cameraValue = cameraController.initialize();
+      await cameraValue;
       if (!mounted) {
         return;
       }
+
       setState(() {});
 
       cameraController.startImageStream((CameraImage image) {
@@ -56,7 +112,9 @@ class _MainPageState extends State<MainPage> {
               Timer(Duration(seconds: 1), () => processCameraImage(image));
         }
       });
-    });
+    } catch (e) {
+      print("Error initializing camera: $e");
+    }
   }
 
   void switchCamera() {
@@ -72,8 +130,6 @@ class _MainPageState extends State<MainPage> {
       final CameraDescription description =
           widget.cameras[isFrontCamera ? 1 : 0];
       int sensorOrientation = description.sensorOrientation;
-
-      // Determine the rotation dynamically based on sensor orientation
       // ImageRotation rotation = _rotationIntToImageRotation(sensorOrientation);
       final GoogleVisionImage visionImage = GoogleVisionImage.fromBytes(
         image.planes[0].bytes,
@@ -185,21 +241,6 @@ class _MainPageState extends State<MainPage> {
     print(message);
   }
 
-  // ImageRotation _rotationIntToImageRotation(int rotation) {
-  //   switch (rotation) {
-  //     case 0:
-  //       return ImageRotation.rotation0;
-  //     case 90:
-  //       return ImageRotation.rotation90;
-  //     case 180:
-  //       return ImageRotation.rotation180;
-  //     case 270:
-  //       return ImageRotation.rotation270;
-  //     default:
-  //       throw Exception("Unknown rotation $rotation");
-  //   }
-  // }
-
   @override
   void dispose() {
     cameraController.dispose();
@@ -208,13 +249,31 @@ class _MainPageState extends State<MainPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (!cameraController.value.isInitialized) {
+    if (cameraController == null || !cameraController.value.isInitialized) {
       return Container();
     }
     return Scaffold(
       body: Stack(
-        children: <Widget>[
-          CameraPreview(cameraController),
+        children: [
+          FutureBuilder<void>(
+            future: cameraValue,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.done) {
+                // If camera initialization is complete, show CameraPreview
+                return CameraPreview(cameraController);
+              } else if (snapshot.hasError) {
+                // If there's an error during initialization, handle it
+                return Center(
+                  child: Text('Error: ${snapshot.error}'),
+                );
+              } else {
+                // While waiting for initialization, show a progress indicator
+                return Center(
+                  child: CircularProgressIndicator(),
+                );
+              }
+            },
+          ),
         ],
       ),
       floatingActionButton: Container(

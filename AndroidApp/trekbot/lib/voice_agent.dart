@@ -1,29 +1,35 @@
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:permission_handler/permission_handler.dart';
 
 class VoiceService {
   late stt.SpeechToText _speech;
   bool _isListening = false;
+  bool _available = false;
   Function(String)? onCommand;
+  Function(bool)? onListeningStatusChanged;
 
-  VoiceService() {
+  VoiceService({this.onListeningStatusChanged}) {
     _speech = stt.SpeechToText();
     _initSpeech();
   }
 
   void _initSpeech() async {
-    bool available = await _speech.initialize(
+    _available = await _speech.initialize(
       onStatus: (status) {
         print('Speech recognition status: $status');
         if (status == 'done' || status == 'notListening') {
-          _startListening(); // Restart listening if it stops
+          _isListening = false;
+          _restartListening();
         }
+        onListeningStatusChanged?.call(status == 'listening');
       },
       onError: (error) {
         print('Error: $error');
-        _startListening(); // Restart listening on error
+        _isListening = false;
+        _restartListening();
       },
     );
-    if (available) {
+    if (_available) {
       print('Speech recognition service initialized');
       _startListening();
     } else {
@@ -32,17 +38,27 @@ class VoiceService {
   }
 
   void _startListening() {
-    if (_isListening) {
+    if (!_available || _isListening) {
       return;
     }
     _isListening = true;
-    _speech.listen(onResult: (result) {
-      print(result);
-      if (result.recognizedWords.toLowerCase().startsWith('alan')) {
-        print("voice agent .....");
-        // Trigger command handling
-        onCommand?.call(result.recognizedWords.substring(4).trim());
-      }
+    _speech.listen(
+      onResult: (result) {
+        print("Recognized Words: ${result.recognizedWords}");
+        onCommand?.call(result.recognizedWords.split('').first);
+        print("result : ${result.recognizedWords.split('').first}");
+      },
+      listenFor: Duration(seconds: 60),
+      pauseFor: Duration(seconds: 10),
+      localeId: "en_US",
+      cancelOnError: false,
+      partialResults: true,
+    );
+  }
+
+  void _restartListening() {
+    Future.delayed(Duration(seconds: 5), () {
+      _startListening();
     });
   }
 
