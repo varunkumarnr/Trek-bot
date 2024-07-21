@@ -45,10 +45,10 @@ class VoiceService {
       onResult: (result) {
         print("Recognized Words: ${result.recognizedWords}");
         onCommand?.call(result.recognizedWords.split(' ').first);
-        print("result : ${result.recognizedWords.split(' r').first}");
+        print("result : ${result.recognizedWords.split(' ').first}");
       },
       listenFor: Duration(seconds: 60),
-      pauseFor: Duration(seconds: 10),
+      pauseFor: Duration(seconds: 30),
       localeId: "en_US",
       cancelOnError: false,
       partialResults: true,
@@ -56,7 +56,7 @@ class VoiceService {
   }
 
   void _restartListening() {
-    Future.delayed(Duration(seconds: 5), () {
+    Future.delayed(Duration(seconds: 3), () {
       _startListening();
     });
   }

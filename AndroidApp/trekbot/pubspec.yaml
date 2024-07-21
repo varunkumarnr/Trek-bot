@@ -16,6 +16,7 @@ dependencies:
   google_ml_vision: ^0.0.8
   speech_to_text: ^6.6.2
   permission_handler: ^11.3.1
+  audioplayers: ^6.0.0
 
 dev_dependencies:
   flutter_test:
@@ -25,4 +26,26 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/haarcascade_frontalface_default.xml
+    - assets/Sounds/Away/Away-1.mp3
+    - assets/Sounds/Away/Away-2.mp3
+    - assets/Sounds/Away/Away-3.mp3
+    - assets/Sounds/Away/Away-4.mp3
+    - assets/Sounds/Away/Away-5.mp3
+    - assets/Sounds/Away/Away-6.mp3
+    - assets/Sounds/Away/Away-7.mp3
+    - assets/Sounds/Away/Away-8.mp3
+    - assets/Sounds/Found/Found-1.mp3
+    - assets/Sounds/Found/Found-2.mp3
+    - assets/Sounds/Found/Found-3.mp3
+    - assets/Sounds/Found/Found-4.mp3
+    - assets/Sounds/Photo/1-Photo.mp3
+    - assets/Sounds/Photo/2-Photo.mp3
+    - assets/Sounds/Photo/3-Photo.mp3
+    - assets/Sounds/Photo/4-Photo.mp3
+    - assets/Sounds/Photo/5-Photo.mp3
+    - assets/Sounds/Photo/6-Photo.mp3
+    - assets/Sounds/Photo/7-Photo.mp3
+    - assets/Sounds/Photo/8-Photo.mp3
+    - assets/Sounds/Startup/startup.mp3
+    - assets/Sounds/Story/Story-1.wav
+    - assets/Sounds/Story/Story-2.wav

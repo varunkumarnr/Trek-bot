@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:google_ml_vision/google_ml_vision.dart';
@@ -7,6 +8,7 @@ import 'voice_agent.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:external_path/external_path.dart';
 import 'package:media_scanner/media_scanner.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class MainPage extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -22,17 +24,23 @@ class _MainPageState extends State<MainPage> {
   bool isDetecting = false;
   List<Face> faces = [];
   Timer? processingTimer;
-  Timer? noFaceTimer;
+  Timer? awayTimer;
+  Timer? longAwayTimer;
   List<List<Offset>> previousPositions = [];
   bool wasFacesEmpty = true;
   bool isFrontCamera = false;
   late VoiceService _voiceService;
   List<File> imagesList = [];
+  bool isListening = false;
+  late AudioPlayer audioPlayer;
+  bool isPersonInFrame = true;
 
   @override
   void initState() {
     super.initState();
+    audioPlayer = AudioPlayer();
     _requestPermissions();
+    _playStartupSound();
   }
 
   void _requestPermissions() async {
@@ -91,6 +99,9 @@ class _MainPageState extends State<MainPage> {
   }
 
   void _handleListeningStatusChanged(bool isListening) {
+    setState(() {
+      this.isListening = isListening;
+    });
     print("Listening status changed: $isListening");
   }
 
@@ -163,6 +174,7 @@ class _MainPageState extends State<MainPage> {
       imagesList.add(file);
     });
     MediaScanner.loadMedia(path: file.path);
+    _playCaptureSound();
   }
 
   void processCameraImage(CameraImage image) async {
@@ -202,9 +214,13 @@ class _MainPageState extends State<MainPage> {
         previousPositions.add(currentFacePositions);
 
         if (!wasFacesEmpty && faces.isEmpty) {
+          isPersonInFrame = false;
           detectDirection(previousPositions);
+          _startAwayTimers();
+        } else if (wasFacesEmpty && faces.isNotEmpty) {
+          _cancelAwayTimers();
+          _playFoundSound();
         }
-
         // Update wasFacesEmpty for the next frame
         wasFacesEmpty = faces.isEmpty;
       });
@@ -263,8 +279,10 @@ class _MainPageState extends State<MainPage> {
     String directionHorizontal;
     if (minDistanceLeft <= minDistanceRight) {
       directionHorizontal = "right";
+      _playAwayRecording();
     } else {
       directionHorizontal = "left";
+      _playAwayRecording();
     }
     String direction = "$directionVertical-$directionHorizontal";
 
@@ -277,6 +295,48 @@ class _MainPageState extends State<MainPage> {
   void dispose() {
     cameraController.dispose();
     super.dispose();
+  }
+
+  void _playStartupSound() {
+    audioPlayer.play(AssetSource('Sounds/Startup/startup.mp3'));
+  }
+
+  void _playCaptureSound() {
+    var randomNumber = Random().nextInt(8) + 1;
+    audioPlayer.play(AssetSource('Sounds/Photo/$randomNumber-Photo.mp3'));
+  }
+
+  void _playAwayRecording() {
+    var randomNumber = Random().nextInt(8) + 1;
+    audioPlayer.play(AssetSource('Sounds/Away/Away-$randomNumber.mp3'));
+  }
+
+  void _playFoundSound() {
+    var randomNumber = Random().nextInt(4) + 1;
+    audioPlayer.play(AssetSource("Sounds/Found/Found-$randomNumber.mp3"));
+  }
+
+  void _playLongAwaySound() {
+    var randomNumber = Random().nextInt(2) + 1;
+    audioPlayer.play(AssetSource("Sounds/Story/Story-$randomNumber.wav"));
+  }
+
+  void _cancelAwayTimers() {
+    awayTimer?.cancel();
+    longAwayTimer?.cancel();
+  }
+
+  void _startAwayTimers() {
+    awayTimer?.cancel();
+    longAwayTimer?.cancel();
+
+    awayTimer = Timer(Duration(seconds: 30), () {
+      _playAwayRecording();
+    });
+
+    longAwayTimer = Timer(Duration(minutes: 2), () {
+      _playLongAwaySound();
+    });
   }
 
   @override
@@ -347,19 +407,31 @@ class _MainPageState extends State<MainPage> {
           ),
         ],
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: Container(
-        width: 70.0, // Set the width of the button
-        height: 70.0, // Set the height of the button
         margin: EdgeInsets.only(bottom: 30, right: 20),
-        child: FittedBox(
-          child: FloatingActionButton(
-            onPressed: switchCamera,
-            backgroundColor: Colors.blue,
-            child: Icon(
-              isFrontCamera ? Icons.camera_rear : Icons.camera_front,
-              size: 24.0, // Adjust the icon size if needed
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            FloatingActionButton(
+              onPressed: switchCamera,
+              backgroundColor: Colors.blue,
+              child: Icon(
+                isFrontCamera ? Icons.camera_rear : Icons.camera_front,
+                size: 32.0,
+              ),
             ),
-          ),
+            SizedBox(width: 40.0), // Spacing between buttons
+
+            FloatingActionButton(
+              onPressed: () {},
+              backgroundColor: isListening ? Colors.green : Colors.red,
+              child: Icon(
+                Icons.mic,
+                size: 32.0,
+              ),
+            ),
+          ],
         ),
       ),
     );
